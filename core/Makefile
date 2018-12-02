@@ -129,7 +129,7 @@ ifeq "$(shell expr $(CXXCOMPILER) = g++)" "1"
   CXXFLAGS += -fno-gnu-unique
 endif
 
-LDFLAGS += -rdynamic -L$(DPDK_LIB_DIR) -Wl,-rpath=$(DPDK_LIB_DIR) -pthread
+LDFLAGS += -rdynamic -L$(DPDK_LIB_DIR) -L/home/ubuntu/bess/deps/reedsolomon -L/home/ubuntu/bess/deps/gofountain -Wl,-rpath=$(DPDK_LIB_DIR) -Wl,-rpath=/home/ubuntu/bess/deps/reedsolomon -Wl,-rpath=/home/ubuntu/bess/deps/gofountain -pthread
 ifdef BESS_LINK_DYNAMIC
   LIBS_ALL_SHARED = -Wl,-call_shared
   LIBS_DL_SHARED =
@@ -446,13 +446,13 @@ $(eval $(call BUILD, \
         LD, \
         $(EXEC), \
         $(OBJS), \
-        $(CXX) -o $$@ $$^ $(LDFLAGS) $(LIBS)))
+        $(CXX) -o $$@ $$^ $(LDFLAGS) $(LIBS) /home/ubuntu/bess/deps/reedsolomon/reedsolomon.so /home/ubuntu/bess/deps/gofountain/raptor.so))
 
 $(eval $(call BUILD, \
         TEST_CXX, \
         %_test.o, \
         %_test.cc $(PROTO_HEADERS), \
-        $(CXX) -o $$@ -c $$< $$(CXXFLAGS) $$(DEPFLAGS)))
+	$(CXX) -o $$@ -c $$< $$(CXXFLAGS) $$(DEPFLAGS)))
 
 $(eval $(call BUILD, \
         TEST_LD, \
@@ -464,7 +464,7 @@ $(eval $(call BUILD, \
         TEST_LD, \
         $(TEST_ALL_EXEC), \
         $(TEST_OBJS) $(MODULE_OBJS) gtest-all.o bess.a, \
-        $(CXX) -o $$@ $$^ $(LDFLAGS) $(LIBS)))
+        $(CXX) -o $$@ $$^ $(LDFLAGS) $(LIBS) /home/ubuntu/bess/deps/reedsolomon/reedsolomon.so /home/ubuntu/bess/deps/gofountain/raptor.so))
 
 $(eval $(call BUILD, \
         TEST_CXX, \
