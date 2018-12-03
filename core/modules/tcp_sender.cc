@@ -30,6 +30,19 @@
 
 #include "tcp_sender.h"
 
+#include "../utils/ether.h"
+#include "../utils/format.h"
+#include "../utils/http_parser.h"
+#include "../utils/ip.h"
+
+using bess::utils::Ethernet;
+using bess::utils::Ipv4;
+using bess::utils::Tcp;
+using bess::utils::be16_t;
+
+bess::utils::be32_t last_seen_seq = bess::utils::be32_t(0);
+
+
 CommandResponse TCPSender::Init(const bess::pb::EmptyArg &) {
   /*task_id_t tid;
 
@@ -48,9 +61,50 @@ CommandResponse TCPSender::Init(const bess::pb::EmptyArg &) {
 void TCPSender::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   //gate_idx_t igate = ctx->current_igate;
 
+  //LOG(INFO) << "hello from process batch";
+
   int cnt = batch->cnt();
+
+  LOG(INFO) << "batch count = " << cnt;
+
   for (int i = 0; i < cnt; i++) {
     bess::Packet *pkt = batch->pkts()[i];    
+    
+    LOG(INFO) << "Got pkt from batch...";
+
+    /* Start copy from url_filter to get TCP header */
+    Ethernet *eth = pkt->head_data<Ethernet *>();
+    Ipv4 *ip = reinterpret_cast<Ipv4 *>(eth + 1);
+
+    if (ip->protocol != Ipv4::Proto::kTcp) {
+      EmitPacket(ctx, pkt, 1);
+      continue;
+    }
+
+    int ip_bytes = ip->header_length << 2;
+    Tcp *tcp = reinterpret_cast<Tcp *>(reinterpret_cast<uint8_t *>(ip) + ip_bytes);
+    /* End copy from url_filter to get TCP header */
+
+    LOG(INFO) << "Processing pkt as TCP...";
+
+
+    if (tcp != NULL) {
+      //printf("seq num = "); printf(tcp->seq_num);
+      //printf(", ack num = "); printf(tcp->ack_num);
+      //printf("tcp not null\n");
+ 	//printf("\n");
+      LOG(INFO) << "tcp not null...";
+    }
+
+    if (tcp->seq_num > last_seen_seq) {
+      last_seen_seq = tcp->seq_num;
+    } else {
+      LOG(INFO) << "Dropping pkt with seq num " << tcp->seq_num;
+      DropPacket(ctx, pkt);
+      continue;
+    }
+
+
     EmitPacket(ctx, pkt, 0);
   }
 

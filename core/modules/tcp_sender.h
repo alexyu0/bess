@@ -34,6 +34,8 @@
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
 
+#include "../utils/tcp_flow_reconstruct.h"
+
 class TCPSender final : public Module {
  public:
   TCPSender() : Module() { is_task_ = true; };
@@ -46,7 +48,7 @@ class TCPSender final : public Module {
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
   static const gate_idx_t kNumIGates = 1;
-  static const gate_idx_t kNumOGates = 1;
+  static const gate_idx_t kNumOGates = 2;
 };
 
 #endif  // BESS_MODULES_TCPSENDER_H_
