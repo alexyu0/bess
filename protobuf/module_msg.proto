@@ -1175,3 +1175,61 @@ message MplsPopArg {
 message WorkerSplitArg {
   map<uint32, uint32> worker_gates = 1; // ogate -> worker mask
 }
+
+/***************************** ALEX ZELEENA 829 *******************************/
+/**
+ * The RandomSplitGE module randomly split/drop packets based on GE model
+ *
+ * __InputGates__: 1
+ * __Output Gates__: many (configurable)
+ */
+message RandomSplitGEArg {
+  repeated int64 gates = 2; /// A list of gate numbers to split the traffic.
+  double p = 0; /// probability of going from good to bad state
+  double r = 1; /// probability of going from bad to good state
+  double g_s = 1; /// probability of emitting packet in bad state
+  double b_s = 0; /// probability of emitting packet in bad state
+}
+
+message RandomSplitGECommandSet_p_Args {
+  double p = 0;
+}
+message RandomSplitGECommandSet_r_Args {
+  double r = 1;
+}
+message RandomSplitGECommandSet_gs_Args {
+  double gs = 1;
+}
+message RandomSplitGECommandSet_bs_Args {
+  double bs = 0;
+}
+
+/**
+ * The RandomSplitGE module has a function `set_gates(...)` which changes
+ * the total number of output gates in the module.
+ */
+message RandomSplitGECommandSetGatesArg {
+  repeated int64 gates = 1; /// A list of gate numbers to split the traffic.
+}
+
+/**
+ * The RandomUpdate module rewrites a specified field (`offset` and `size`) in a packet
+ * with a random value between a specified min and max values.
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: 1
+ */
+message RandomUpdateArg {
+  /**
+   * RandomUpdate's Field specifies where to rewrite, and what values to rewrite
+   * in each packet processed.
+   */
+  message Field {
+    int64 offset = 1; /// Offset in bytes of where to rewrite.
+    uint64 size = 2; /// The number of bytes to write.
+    uint64 min = 3; /// The minimum value to insert into the packet.
+    uint64 max = 4; /// The maximum value to insert into the packet.
+  }
+  repeated Field fields = 1; /// A list of Random Update Fields.
+}
+/********************************* END ****************************************/
