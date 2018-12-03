@@ -39,8 +39,11 @@ class TCPSender final : public Module {
   TCPSender() : Module() { is_task_ = true; };
   CommandResponse Init(const bess::pb::EmptyArg &arg);
 
-  struct task_result RunTask(Context *ctx, bess::PacketBatch *batch,
+  /*struct task_result RunTask(Context *ctx, bess::PacketBatch *batch,
                              void *arg) override;
+  */
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch);
 
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 1;

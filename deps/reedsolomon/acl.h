@@ -1,4 +1,3 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
 // Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // All rights reserved.
 //
@@ -28,32 +27,48 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "tcp_sender.h"
+#ifndef BESS_MODULES_ACL_H_
+#define BESS_MODULES_ACL_H_
 
-CommandResponse TCPSender::Init(const bess::pb::EmptyArg &) {
-  task_id_t tid;
+#include <vector>
 
-  tid = RegisterTask(nullptr);
-  if (tid == INVALID_TASK_ID)
-    return CommandFailure(ENOMEM, "Context creation failed");
+#include "../../../module.h"
+#include "../../../pb/module_msg.pb.h"
+#include "../../../utils/ip.h"
 
-  return CommandSuccess();
-}
+using bess::utils::be16_t;
+using bess::utils::be32_t;
+using bess::utils::Ipv4Prefix;
 
-/*struct task_result TCPSender::RunTask(Context *, bess::PacketBatch *, void *) {
-  return {.block = false, .packets = 0, .bits = 0};
-}
-*/
+class ACL final : public Module {
+ public:
+  struct ACLRule {
+    bool Match(be32_t sip, be32_t dip, be16_t sport, be16_t dport) const {
+      return src_ip.Match(sip) && dst_ip.Match(dip) &&
+             (src_port == be16_t(0) || src_port == sport) &&
+             (dst_port == be16_t(0) || dst_port == dport);
+    }
 
-void TCPSender::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
-  //gate_idx_t igate = ctx->current_igate;
+    Ipv4Prefix src_ip;
+    Ipv4Prefix dst_ip;
+    be16_t src_port;
+    be16_t dst_port;
+    bool drop;
+  };
 
-  int cnt = batch->cnt();
-  for (int i = 0; i < cnt; i++) {
-    bess::Packet *pkt = batch->pkts()[i];    
-    EmitPacket(ctx, pkt, 0);
-  }
+  static const Commands cmds;
 
-}
+  ACL() : Module() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
-ADD_MODULE(TCPSender, "tcp_sender", "sends pseudo TCP messages")
+  CommandResponse Init(const bess::pb::ACLArg &arg);
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
+  CommandResponse CommandAdd(const bess::pb::ACLArg &arg);
+  CommandResponse CommandClear(const bess::pb::EmptyArg &arg);
+
+ private:
+  std::vector<ACLRule> rules_;
+};
+
+#endif  // BESS_MODULES_ACL_H_
