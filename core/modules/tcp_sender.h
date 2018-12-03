@@ -43,7 +43,7 @@ class TCPSender final : public Module {
                              void *arg) override;
   */
 
-  void ProcessBatch(Context *ctx, bess::PacketBatch *batch);
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 1;

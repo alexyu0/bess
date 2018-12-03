@@ -31,12 +31,12 @@
 #include "tcp_sender.h"
 
 CommandResponse TCPSender::Init(const bess::pb::EmptyArg &) {
-  task_id_t tid;
+  /*task_id_t tid;
 
   tid = RegisterTask(nullptr);
   if (tid == INVALID_TASK_ID)
     return CommandFailure(ENOMEM, "Context creation failed");
-
+  */
   return CommandSuccess();
 }
 
