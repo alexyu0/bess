@@ -31,7 +31,7 @@ modules.order
 # Shared objects
 *.so
 *.so.*
-!deps/*.so
+!deps/*/*.so
 
 # 3rd-party libraries
 deps/dpdk*

@@ -40,8 +40,16 @@ CommandResponse TCPSender::Init(const bess::pb::EmptyArg &) {
   return CommandSuccess();
 }
 
-struct task_result TCPSender::RunTask(Context *, bess::PacketBatch *, void *) {
+/*struct task_result TCPSender::RunTask(Context *, bess::PacketBatch *, void *) {
   return {.block = false, .packets = 0, .bits = 0};
+}
+*/
+
+void TCPSender::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  //gate_idx_t igate = ctx->current_igate;
+
+  EmitPacket(ctx, pkt, 0);
+
 }
 
 ADD_MODULE(TCPSender, "tcp_sender", "sends pseudo TCP messages")
