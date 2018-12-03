@@ -53,16 +53,22 @@ packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
 
 # Our real setup
 myport::PMDPort(port_id=0, num_inc_q=1, num_out_q=1)
-input0::QueueInc(port=myport, qid=0)
-output0::QueueOut(port=myport, qid=0)
+#input0::QueueInc(port=myport, qid=0)
+#output0::QueueOut(port=myport, qid=0)
+#my_vhost::PMDPort(vdev='eth_vhost0,iface=/tmp/my_vhost.sock,queues=1')
+#input0::QueueInc(port=my_vhost, qid=0)
+#output0::QueueOut(port=my_vhost, qid=0)
+host_if = VPort(ifname='eth_host', ip_addrs=['172.31.111.5/32'])
+PortInc(port=host_if) -> PortOut(port=myport)
+PortInc(port=myport) -> PortOut(port=host_if)
 
 # Test pipeline
 # Source() -> Rewrite(templates=packets) -> fw -> Sink()
 # Source() -> Sink()
 
 # Our real pipeline
-input0 -> output0
+#input0 -> output0
 
 # PortInc(port= ) -> PortOut(port = )
 
-os.system('iperf3 -s -B ens4')
+#os.system('iperf3 -s -B ens4')
