@@ -77,7 +77,7 @@ void TCPSender::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     Ipv4 *ip = reinterpret_cast<Ipv4 *>(eth + 1);
 
     if (ip->protocol != Ipv4::Proto::kTcp) {
-      EmitPacket(ctx, pkt, 1);
+      EmitPacket(ctx, pkt, 1); // Drop
       continue;
     }
 
@@ -88,19 +88,12 @@ void TCPSender::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     LOG(INFO) << "Processing pkt as TCP...";
 
 
-    if (tcp != NULL) {
-      //printf("seq num = "); printf(tcp->seq_num);
-      //printf(", ack num = "); printf(tcp->ack_num);
-      //printf("tcp not null\n");
- 	//printf("\n");
-      LOG(INFO) << "tcp not null...";
-    }
 
     if (tcp->seq_num > last_seen_seq) {
       last_seen_seq = tcp->seq_num;
     } else {
       LOG(INFO) << "Dropping pkt with seq num " << tcp->seq_num;
-      DropPacket(ctx, pkt);
+      EmitPacket(ctx, pkt, 1); // Drop
       continue;
     }
 
