@@ -1178,6 +1178,7 @@ message WorkerSplitArg {
 
 /***************************** ALEX ZELEENA 829 *******************************/
 /**
+/**
  * The RandomSplitGE module randomly split/drop packets based on GE model
  *
  * __InputGates__: 1
@@ -1211,6 +1212,7 @@ message RandomSplitGECommandSet_bs_Args {
 message RandomSplitGECommandSetGatesArg {
   repeated int64 gates = 1; /// A list of gate numbers to split the traffic.
 }
+*/
 
 /**
  * RaptorAndLoss module, uses GE model
