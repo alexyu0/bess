@@ -28,8 +28,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "raptor.h"
-#include "raptor_module.h"
 #include <vector>
 #include <unistd.h>
 
@@ -56,7 +54,7 @@ CommandResponse RaptorAndLoss::Init(const bess::pb::RaptorAndLossArg &arg) {
 
   // Setup Raptor code params
   T_ = arg.T();
-  K_min_ = arg.k_min(); x                
+  K_min_ = arg.k_min();    
   // GoInt source_block_size = 13; // TODO set
   // GoInt alignment_size = 1; // TODO set
 

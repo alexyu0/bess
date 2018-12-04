@@ -33,7 +33,6 @@
 
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
-#include "raptor.h"
 
 class RaptorAndLoss final : public Module {
 
