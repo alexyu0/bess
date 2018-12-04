@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2016, The Regents of the University of California.
+// Copyright (c) 2017, Vivian Fang.
 // Copyright (c) 2016-2017, Nefeli Networks, Inc.
 // All rights reserved.
 //
@@ -28,30 +28,48 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef BESS_MODULES_RAPTORMODULE_H_
-#define BESS_MODULES_RAPTORMODULE_H_
+#ifndef BESS_MODULES_RANDOM_SPLIT_H_
+#define BESS_MODULES_RANDOM_SPLIT_H_
 
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
-#include "raptor.h"
+#include "../utils/random.h"
 
-class RaptorAndLoss final : public Module {
+// Maximum number of output gates to allow.
+#define MAX_SPLIT_GATES 16384
 
+// RandomSplit splits and drop packets.
+class RandomSplit final : public Module {
  public:
-  CommandResponse Init(const bess::pb::RaptorAndLossArg &arg);
+  RandomSplit() : Module() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
-  static const gate_idx_t kNumIGates = 1;
-  static const gate_idx_t kNumOGates = 1;
+  static const gate_idx_t kNumOGates = MAX_GATES;
+  static const Commands cmds;
+ 
+  CommandResponse Init(const bess::pb::RandomSplitArg &arg);
+  CommandResponse CommandSet_p(
+      const bess::pb::RandomSplitGECommandSet_p_Arg &arg);
+  CommandResponse CommandSet_r(
+      const bess::pb::RandomSplitGECommandSet_r_Arg &arg);
+    CommandResponse CommandSet_gs(
+    const bess::pb::RandomSplitGECommandSet_gs_Arg &arg);
+    CommandResponse CommandSet_bs(
+    const bess::pb::RandomSplitGECommandSet_bs_Arg &arg);
+  CommandResponse CommandSetGates(
+      const bess::pb::RandomSplitCommandSetGatesArg &arg);
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
   Random rng_;  // Random number generator
+  double drop_rate_;
+  gate_idx_t gates_[MAX_SPLIT_GATES];
+  gate_idx_t ngates_;
   double p_;
   double r_;
   double g_s_;
   double b_s_;
   int ge_state_; // 0 = bad, 1 = good
-  int T_; // symbol size
-  int K_min_; // minimum source block size
 };
 
-#endif  // BESS_MODULES_RAPTORMODULE_H_
+#endif  // BESS_MODULES_RANDOM_SPLIT_H_

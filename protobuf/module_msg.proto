@@ -1175,3 +1175,52 @@ message MplsPopArg {
 message WorkerSplitArg {
   map<uint32, uint32> worker_gates = 1; // ogate -> worker mask
 }
+
+/***************************** ALEX ZELEENA 829 *******************************/
+/**
+ * The RandomSplitGE module randomly split/drop packets based on GE model
+ *
+ * __InputGates__: 1
+ * __Output Gates__: many (configurable)
+ */
+message RandomSplitGEArg {
+  repeated int64 gates = 2; /// A list of gate numbers to split the traffic.
+  double p = 0; /// probability of going from good to bad state
+  double r = 1; /// probability of going from bad to good state
+  double g_s = 1; /// probability of emitting packet in bad state
+  double b_s = 0; /// probability of emitting packet in bad state
+}
+
+message RandomSplitGECommandSet_p_Args {
+  double p = 0;
+}
+message RandomSplitGECommandSet_r_Args {
+  double r = 1;
+}
+message RandomSplitGECommandSet_gs_Args {
+  double gs = 1;
+}
+message RandomSplitGECommandSet_bs_Args {
+  double bs = 0;
+}
+
+/**
+ * The RandomSplitGE module has a function `set_gates(...)` which changes
+ * the total number of output gates in the module.
+ */
+message RandomSplitGECommandSetGatesArg {
+  repeated int64 gates = 1; /// A list of gate numbers to split the traffic.
+}
+
+/**
+ * RaptorAndLoss module, uses GE model
+ */
+message RaptorAndLossArg {
+  double p = 0; /// probability of going from good to bad state
+  double r = 1; /// probability of going from bad to good state
+  double g_s = 1; /// probability of emitting packet in bad state
+  double b_s = 0; /// probability of emitting packet in bad state
+  int T = 16; /// size of symbols in bytes
+  int k_min = 250; /// minimum source block size in symbols
+}
+/********************************* END ****************************************/
