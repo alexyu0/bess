@@ -35,7 +35,6 @@
 
 CommandResponse RaptorAndLoss::Init(const bess::pb::RaptorAndLossArg &arg) {
   // Setup GE model
-  double drop_rate = arg.drop_rate();
   double p = arg.p();
   double r = arg.r();
   double g_s = arg.g_s();
