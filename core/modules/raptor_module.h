@@ -33,17 +33,25 @@
 
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
+#include "raptor.h"
 
-class RaptorModule final : public Module {
+class RaptorAndLoss final : public Module {
+
  public:
-  RaptorModule() : Module() { is_task_ = true; };
-  CommandResponse Init(const bess::pb::EmptyArg &arg);
-
-  struct task_result RunTask(Context *ctx, bess::PacketBatch *batch,
-                             void *arg) override;
+  CommandResponse Init(const bess::pb::RaptorAndLossArg &arg);
 
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 1;
+
+ private:
+  Random rng_;  // Random number generator
+  double p_;
+  double r_;
+  double g_s_;
+  double b_s_;
+  int ge_state_; // 0 = bad, 1 = good
+  int T_; // symbol size
+  int K_min_; // minimum source block size
 };
 
 #endif  // BESS_MODULES_RAPTORMODULE_H_

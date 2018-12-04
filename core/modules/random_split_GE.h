@@ -45,10 +45,16 @@ class RandomSplit final : public Module {
 
   static const gate_idx_t kNumOGates = MAX_GATES;
   static const Commands cmds;
-
+ 
   CommandResponse Init(const bess::pb::RandomSplitArg &arg);
-  CommandResponse CommandSetDroprate(
-      const bess::pb::RandomSplitCommandSetDroprateArg &arg);
+  CommandResponse CommandSet_p(
+      const bess::pb::RandomSplitGECommandSet_p_Arg &arg);
+  CommandResponse CommandSet_r(
+      const bess::pb::RandomSplitGECommandSet_r_Arg &arg);
+    CommandResponse CommandSet_gs(
+    const bess::pb::RandomSplitGECommandSet_gs_Arg &arg);
+    CommandResponse CommandSet_bs(
+    const bess::pb::RandomSplitGECommandSet_bs_Arg &arg);
   CommandResponse CommandSetGates(
       const bess::pb::RandomSplitCommandSetGatesArg &arg);
 

@@ -1213,23 +1213,14 @@ message RandomSplitGECommandSetGatesArg {
 }
 
 /**
- * The RandomUpdate module rewrites a specified field (`offset` and `size`) in a packet
- * with a random value between a specified min and max values.
- *
- * __Input Gates__: 1
- * __Output Gates__: 1
+ * RaptorAndLoss module, uses GE model
  */
-message RandomUpdateArg {
-  /**
-   * RandomUpdate's Field specifies where to rewrite, and what values to rewrite
-   * in each packet processed.
-   */
-  message Field {
-    int64 offset = 1; /// Offset in bytes of where to rewrite.
-    uint64 size = 2; /// The number of bytes to write.
-    uint64 min = 3; /// The minimum value to insert into the packet.
-    uint64 max = 4; /// The maximum value to insert into the packet.
-  }
-  repeated Field fields = 1; /// A list of Random Update Fields.
+message RaptorAndLossArg {
+  double p = 0; /// probability of going from good to bad state
+  double r = 1; /// probability of going from bad to good state
+  double g_s = 1; /// probability of emitting packet in bad state
+  double b_s = 0; /// probability of emitting packet in bad state
+  int T = 16; /// size of symbols in bytes
+  int k_min = 250; /// minimum source block size in symbols
 }
 /********************************* END ****************************************/

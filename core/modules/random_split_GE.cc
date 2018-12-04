@@ -38,8 +38,14 @@ static inline bool is_valid_gate(gate_idx_t gate) {
 }
 
 const Commands RandomSplitGE::cmds = {
-    {"set_droprate", "RandomSplitGECommandSetDroprateArg",
-     MODULE_CMD_FUNC(&RandomSplitGE::CommandSetDroprate), Command::THREAD_UNSAFE},
+    {"set_droprate", "RandomSplitGECommandSet_p_Arg",
+     MODULE_CMD_FUNC(&RandomSplitGE::CommandSet_p), Command::THREAD_UNSAFE},
+     {"set_droprate", "RandomSplitGECommandSet_r_Arg",
+     MODULE_CMD_FUNC(&RandomSplitGE::CommandSet_r), Command::THREAD_UNSAFE},
+     {"set_droprate", "RandomSplitGECommandSet_gs_Arg",
+     MODULE_CMD_FUNC(&RandomSplitGE::CommandSet_gs), Command::THREAD_UNSAFE},
+     {"set_droprate", "RandomSplitGECommandSet_bs_Arg",
+     MODULE_CMD_FUNC(&RandomSplitGE::CommandSet_bs), Command::THREAD_UNSAFE},
     {"set_gates", "RandomSplitGECommandSetGatesArg",
      MODULE_CMD_FUNC(&RandomSplitGE::CommandSetGates), Command::THREAD_UNSAFE}};
 
@@ -49,13 +55,13 @@ CommandResponse RandomSplitGE::Init(const bess::pb::RandomSplitGEArg &arg) {
   double r = arg.r();
   double g_s = arg.g_s();
   double b_s = arg.b_s();
-  if p < 0 || p > 1) {
+  if (p < 0 || p > 1) {
     return CommandFailure(EINVAL, "p needs to be between [0, 1]");
-  } else if r < 0 || r > 1) {
+  } else if (r < 0 || r > 1) {
     return CommandFailure(EINVAL, "r needs to be between [0, 1]");
-  } else if g_s < 0 || g_s > 1) {
+  } else if (g_s < 0 || g_s > 1) {
     return CommandFailure(EINVAL, "g_s needs to be between [0, 1]");
-  } else if b_s < 0 || b_s > 1) {
+  } else if (b_s < 0 || b_s > 1) {
     return CommandFailure(EINVAL, "b_s needs to be between [0, 1]");
   }
   p_ = p;
