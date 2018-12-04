@@ -1,0 +1,31 @@
+import json
+import os
+
+client = PMDPort(pci="06:00.1") 
+server = PMDPort(pci="06:00.0")
+
+# check if environment variables to say how to use Queue
+server_in = PortInc(port=server.name)
+client_in = PortInc(port=client.name)
+server_out = PortOut(port=server.name)
+client_out = PortOut(port=client.name)
+
+# our modules
+re_tx_filter = TCPSender()
+rand_split = RandomSplit(drop_rate=0.25, gates=[0,1])
+dropsink = Sink()
+
+#client_in -> server_out
+
+client_in -> rand_split 
+rand_split:0 -> re_tx_filter
+rand_split:1 -> dropsink
+
+re_tx_filter:0 -> server_out
+re_tx_filter:1 -> dropsink
+
+#server_in -> rand_split
+#rand_split:0 -> client_out
+#rand_split:1 -> dropsink
+
+server_in -> client_out
