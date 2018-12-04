@@ -33,9 +33,11 @@ import scapy.all as scapy
 def gen_packet(proto, src_ip, dst_ip):
     eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
     ip = scapy.IP(src=src_ip, dst=dst_ip)
-    udp = proto(sport=10001, dport=10002)
-    payload = 'helloworld'
-    pkt = eth/ip/udp/payload
+    tcp = scapy.TCP(sport=10001, dport=80, seq=12345)
+    #udp = proto(sport=10001, dport=10002)
+    #payload = 'helloworld'
+    payload = 'GET /pub/WWW/TheProject.html HTTP/1.1\r\nHost: www.google.com\r\n\r\n'
+    pkt = eth/ip/tcp/payload
     return bytes(pkt)
 
 packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
@@ -46,6 +48,19 @@ packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
            gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
           ]
 
-sender::TCPSender()
+#blacklist_rules = [{'host': 'www.%d.com' % i, 'path': '/'} for i in range(100)]
 
-Source() -> sender -> Sink()
+
+#sender::TCPSender(blacklist=blacklist_rules)
+
+re_tx_filter::TCPSender()
+rs::RandomSplit(drop_rate=0.25, gates=[0,1])
+dropsink::Sink()
+
+
+Source() -> Rewrite(templates=packets) -> rs
+rs:0 -> re_tx_filter
+rs:1 -> dropsink
+
+re_tx_filter:0 -> Sink()
+re_tx_filter:1 -> dropsink
