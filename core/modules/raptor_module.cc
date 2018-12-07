@@ -34,6 +34,88 @@
 #include <string>
 #include <numeric>
 
+// Template for generating TCP packets without data
+struct[[gnu::packed]] PacketTemplate {
+  Ethernet eth;
+  Ipv4 ip;
+  Tcp tcp;
+
+  PacketTemplate() {
+    eth.dst_addr = Ethernet::Address();  // To fill in
+    eth.src_addr = Ethernet::Address();  // To fill in
+    eth.ether_type = be16_t(Ethernet::Type::kIpv4);
+    ip.version = 4;
+    ip.header_length = 5;
+    ip.type_of_service = 0;
+    ip.length = be16_t(40);
+    ip.id = be16_t(0);  // To fill in
+    ip.fragment_offset = be16_t(0);
+    ip.ttl = 0x40;
+    ip.protocol = Ipv4::Proto::kTcp;
+    ip.checksum = 0;           // To fill in
+    ip.src = be32_t(0);        // To fill in
+    ip.dst = be32_t(0);        // To fill in
+    tcp.src_port = be16_t(0);  // To fill in
+    tcp.dst_port = be16_t(0);  // To fill in
+    tcp.seq_num = be32_t(0);   // To fill in
+    tcp.ack_num = be32_t(0);   // To fill in
+    tcp.reserved = 0;
+    tcp.offset = 5;
+    tcp.flags = Tcp::Flag::kAck | Tcp::Flag::kRst;
+    tcp.window = be16_t(0);
+    tcp.checksum = 0;  // To fill in
+    tcp.urgent_ptr = be16_t(0);
+  }
+};
+
+inline static bess::Packet *GenerateEncodedPkt(bess::Packet *old_pkt, const char []body) {
+  Ethernet *old_eth = old_pkt->head_data<Ethernet *>();
+  Ipv4 *old_ip = reinterpret_cast<Ipv4 *>(old_eth + 1);
+  int ip_bytes = old_ip->header_length << 2;
+  Tcp *old_tcp =reinterpret_cast<Tcp *>(reinterpret_cast<uint8_t *>(old_ip) + ip_bytes);
+  const Ethernet::Address &src_eth = old_eth->src_addr;
+  const Ethernet::Address &dst_eth = old_eth->dst_addr;
+  be32_t src_ip = old_ip->src;
+  be32_t dst_ip = old_ip->dst;
+  be16_t src_port = old_tcp->src_port;
+  be16_t dst_port = old_tcp->dst_port;
+  be32_t seq = old_tcp->seq_num;
+  be32_t ack = old_tcp->ack_num;
+
+  bess::Packet *pkt = current_worker.packet_pool()->Alloc();
+  char *ptr = static_cast<char *>(pkt->buffer()) + SNBUF_HEADROOM;
+  pkt->set_data_off(SNBUF_HEADROOM);
+
+  constexpr size_t len = sizeof(body) - 1;
+  pkt->set_total_len(sizeof(rst_template) + len);
+  pkt->set_data_len(sizeof(rst_template) + len);
+
+  bess::utils::Copy(ptr, &rst_template, sizeof(rst_template));
+  bess::utils::Copy(ptr + sizeof(rst_template), body, len);
+  LOG(INFO) << "hello " << ptr;
+
+  Ethernet *eth = reinterpret_cast<Ethernet *>(ptr);
+  Ipv4 *ip = reinterpret_cast<Ipv4 *>(eth + 1);
+  Tcp *tcp = reinterpret_cast<Tcp *>(ip + 1);
+
+  eth->dst_addr = dst_eth;
+  eth->src_addr = src_eth;
+  ip->id = be16_t(1);  // assumes the SYN packet used ID 0
+  ip->src = src_ip;
+  ip->dst = dst_ip;
+  ip->length = be16_t(40 + len);
+  tcp->src_port = src_port;
+  tcp->dst_port = dst_port;
+  tcp->seq_num = seq;
+  tcp->ack_num = ack;
+  tcp->flags = Tcp::Flag::kAck;
+  tcp->checksum = bess::utils::CalculateIpv4TcpChecksum(*tcp, src_ip, dst_ip,
+                                                        sizeof(*tcp) + len);
+  ip->checksum = bess::utils::CalculateIpv4NoOptChecksum(*ip);
+
+  return pkt;
+}
+
 /********************************** ENCODER ***********************************/
 CommandResponse RaptorEncoder::Init(const bess::pb::RaptorEncoderArg &arg) {
   // Setup Raptor code params
@@ -82,13 +164,8 @@ void RaptorEncoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       strncpy((char *)pkt_data + 8, (char *)s_s_char, 4);
       symbol_start++;
 
-      bess::Packet *pkt_copy = bess::Packet::copy(pkt);
-      pkt_copy->set_total_len(T_ + 12);
-      pkt_copy->set_data_len(T_ + 12);
-      LOG(INFO) << "hello " << pkt_copy->buffer<char *>();
-      char *ptr = pkt_copy->buffer<char *>() + pkt_copy->data_off();
-      bess::utils::CopyInlined(ptr, pkt_data, T_ + 12, true);
-      LOG(INFO) << "hello2 " << pkt_copy->buffer<char *>();
+      LOG(INFO) << "what is data " << pkt_data;
+      bess::Packet *pkt_copy = GenerateEncodedPkt(pkt, pkt_data);
       EmitPacket(ctx, pkt_copy, 0);
     }
 
@@ -124,7 +201,7 @@ void RaptorDecoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     pkt = batch->pkts()[i];
     
     // dissect packet to get source block ID, symbol ID, source block size
-    std::string buffer = pkt->buffer<char *>() + pkt->data_off();
+    std::string buffer = std::string(pkt->data());
     src_blk_id = int((unsigned char)(buffer.c_str()[0]) << 24 |
             (unsigned char)(buffer.c_str()[1]) << 16 |
             (unsigned char)(buffer.c_str()[2]) << 8 |
