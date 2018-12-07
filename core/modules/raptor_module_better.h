@@ -33,14 +33,50 @@
 
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
+#include <vector>
+#include <map>
 
-class RaptorAndLoss final : public Module {
+class RaptorEncoder final : public Module {
 
  public:
-  CommandResponse Init(const bess::pb::RaptorAndLossArg &arg);
+  CommandResponse Init(const bess::pb::RaptorEncoderArg &arg);
+  static const size_t kMaxTemplateSize = 1512;
 
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 1;
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
+ private:
+  int T_; // symbol size
+  int K_min_; // minimum source block size
+  int block_id_; // current block ID
+};
+
+class RaptorDecoder final : public Module {
+
+ public:
+  CommandResponse Init(const bess::pb::RaptorDecoderArg &arg);
+
+  static const gate_idx_t kNumIGates = 1;
+  static const gate_idx_t kNumOGates = 1;
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
+ private:
+  int T_; // symbol size
+  int K_min_; // minimum source block size
+  std::map<int, int> block_sizes_; // size of blocks being decoded
+  std::map<int, std::vector<int>> symbols_recv_block_; // block to vector of symbols received
+};
+
+class GELoss final : public Module {
+
+ public:
+  CommandResponse Init(const bess::pb::GELossArg &arg);
+
+  static const gate_idx_t kNumIGates = 1;
+  static const gate_idx_t kNumOGates = 2; // 1 is sink
 
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
@@ -51,8 +87,6 @@ class RaptorAndLoss final : public Module {
   double g_s_;
   double b_s_;
   int ge_state_; // 0 = bad, 1 = good
-  int T_; // symbol size
-  int K_min_; // minimum source block size
 };
 
 #endif  // BESS_MODULES_RAPTORMODULE_H_
