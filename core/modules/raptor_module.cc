@@ -124,3 +124,53 @@ ADD_MODULE(RaptorAndLoss,
 // ADD_MODULE(RepairForwarder, 
 //   "repair_forwarder", 
 //   "forwards repair requests from decoder to encoder")
+
+
+CommandResponse GELoss::Init(const bess::pb::GELossArg &arg) {
+  // Setup GE model
+  // TODO try different values
+  double p = arg.p();
+  double r = arg.r();
+  double g_s = arg.g_s();
+  double b_s = arg.b_s();
+  if (p < 0 || p > 1) {
+    return CommandFailure(EINVAL, "p needs to be between [0, 1]");
+  } else if (r < 0 || r > 1) {
+    return CommandFailure(EINVAL, "r needs to be between [0, 1]");
+  } else if (g_s < 0 || g_s > 1) {
+    return CommandFailure(EINVAL, "g_s needs to be between [0, 1]");
+  } else if (b_s < 0 || b_s > 1) {
+    return CommandFailure(EINVAL, "b_s needs to be between [0, 1]");
+  }
+  p_ = p;
+  r_ = r;
+  g_s_ = g_s;
+  b_s_ = b_s;
+  ge_state_ = 1;
+  
+  return CommandSuccess();
+}
+
+void GELoss::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  int cnt = batch->cnt();
+  for (int i = 0; i < cnt; i++) {
+    bess::Packet *pkt = batch->pkts()[i];
+    if (rng_.GetReal() <= p_ && ge_state_ == 1) {
+      ge_state_ = 0;
+    } else if (rng_.GetReal() <= r_ && ge_state_ == 0) {
+      ge_state_ = 1;
+    }
+
+    double drop_prob = rng_.GetReal();
+    if ((ge_state_ == 1 && drop_prob <= (1 - g_s_)) ||
+          (ge_state_ == 0 && drop_prob <= (1 - b_s_))) {
+      EmitPacket(ctx, pkt, 1);
+    } else {
+      EmitPacket(ctx, pkt, 0);
+    }
+  }
+}
+
+ADD_MODULE(GELoss, 
+  "ge_loss", 
+  "loss model based on GE model")

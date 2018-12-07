@@ -55,4 +55,23 @@ class RaptorAndLoss final : public Module {
   int K_min_; // minimum source block size
 };
 
+class GELoss final : public Module {
+
+ public:
+  CommandResponse Init(const bess::pb::GELossArg &arg);
+
+  static const gate_idx_t kNumIGates = 1;
+  static const gate_idx_t kNumOGates = 2; // 1 is sink
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
+ private:
+  Random rng_;  // Random number generator
+  double p_;
+  double r_;
+  double g_s_;
+  double b_s_;
+  int ge_state_; // 0 = bad, 1 = good
+};
+
 #endif  // BESS_MODULES_RAPTORMODULE_H_
