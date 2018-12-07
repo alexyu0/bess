@@ -1272,4 +1272,16 @@ message GELossArg {
   double g_s = 3; /// probability of emitting packet in bad state
   double b_s = 4; /// probability of emitting packet in bad state
 }
+
+/**
+ * RaptorAndLoss module
+ */
+message RaptorAndLossArg {
+  double p = 1; /// probability of going from good to bad state
+  double r = 2; /// probability of going from bad to good state
+  double g_s = 3; /// probability of emitting packet in bad state
+  double b_s = 4; /// probability of emitting packet in bad state
+  uint32 t = 5; /// size of symbols in bytes
+  uint32 k_min = 6; /// minimum source block size in symbols
+}
 /********************************* END ****************************************/

@@ -54,7 +54,7 @@ CommandResponse RaptorAndLoss::Init(const bess::pb::RaptorAndLossArg &arg) {
   ge_ge_state_ = 1;
 
   // Setup Raptor code params
-  T_ = arg.T();
+  T_ = arg.t();
   K_min_ = arg.k_min();    
   // GoInt source_block_size = 13; // TODO set
   // GoInt alignment_size = 1; // TODO set

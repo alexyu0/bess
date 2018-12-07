@@ -11,24 +11,8 @@ server_out = PortOut(port=server.name)
 client_out = PortOut(port=client.name)
 
 # our modules
-re_tx_filter = TCPSender()
-dup_ack_filter = DropDupAck()
-cli_dropsink = Sink()
-srv_dropsink = Sink()
-loss_dropsink = Sink()
-raptor_enc = RaptorEncoder(t=16, k_min=250)
-raptor_dec = RaptorDecoder(t=16, k_min=250)
-loss = GELoss(p=0.01, r=0.5, g_s=1.0, b_s=0.0)
+raptor = Raptor(p=0.01, r=0.5, g_s=1.0, b_s=0.0, t=16, k_min=250)
 
-# client to server
-client_in -> re_tx_filter
-re_tx_filter:0 -> raptor_enc -> loss
-loss:0 -> raptor_dec -> server_out
-loss:1 -> loss_dropsink
-re_tx_filter:1 -> cli_dropsink
-
-# server to client
-server_in -> dup_ack_filter
-dup_ack_filter:0 -> client_out
-dup_ack_filter:1 -> srv_dropsink
-
+#client_in -> server_out
+client_in -> raptor -> server_out
+server_in -> client_out
