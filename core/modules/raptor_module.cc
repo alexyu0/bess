@@ -29,10 +29,23 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include "raptor_module.h"
+#include "../utils/checksum.h"
+#include "../utils/ether.h"
+#include "../utils/format.h"
+#include "../utils/http_parser.h"
+#include "../utils/ip.h"
+#include "../module.h"
+
 #include <vector>
 #include <unistd.h>
 #include <string>
 #include <numeric>
+
+using bess::utils::Ethernet;
+using bess::utils::Ipv4;
+using bess::utils::Tcp;
+using bess::utils::be16_t;
+using bess::utils::be32_t;
 
 // Template for generating TCP packets without data
 struct[[gnu::packed]] PacketTemplate {
@@ -68,7 +81,12 @@ struct[[gnu::packed]] PacketTemplate {
   }
 };
 
-inline static bess::Packet *GenerateEncodedPkt(bess::Packet *old_pkt, const char []body) {
+static PacketTemplate rst_template;
+
+inline static bess::Packet *GenerateEncodedPkt(bess::Packet *old_pkt, 
+    const char body[], const int body_size) {
+  bess::Packet *pkt = bess::Packet::Alloc();
+
   Ethernet *old_eth = old_pkt->head_data<Ethernet *>();
   Ipv4 *old_ip = reinterpret_cast<Ipv4 *>(old_eth + 1);
   int ip_bytes = old_ip->header_length << 2;
@@ -82,11 +100,10 @@ inline static bess::Packet *GenerateEncodedPkt(bess::Packet *old_pkt, const char
   be32_t seq = old_tcp->seq_num;
   be32_t ack = old_tcp->ack_num;
 
-  bess::Packet *pkt = current_worker.packet_pool()->Alloc();
   char *ptr = static_cast<char *>(pkt->buffer()) + SNBUF_HEADROOM;
   pkt->set_data_off(SNBUF_HEADROOM);
 
-  constexpr size_t len = sizeof(body) - 1;
+  size_t len = body_size;
   pkt->set_total_len(sizeof(rst_template) + len);
   pkt->set_data_len(sizeof(rst_template) + len);
 
@@ -165,7 +182,7 @@ void RaptorEncoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       symbol_start++;
 
       LOG(INFO) << "what is data " << pkt_data;
-      bess::Packet *pkt_copy = GenerateEncodedPkt(pkt, pkt_data);
+      bess::Packet *pkt_copy = GenerateEncodedPkt(pkt, (char *)pkt_data, T_ + 12);
       EmitPacket(ctx, pkt_copy, 0);
     }
 
