@@ -29,7 +29,6 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include "raptor_module.h"
-#include ""
 #include <vector>
 #include <unistd.h>
 #include <string>
@@ -38,7 +37,7 @@
 /********************************** ENCODER ***********************************/
 CommandResponse RaptorEncoder::Init(const bess::pb::RaptorEncoderArg &arg) {
   // Setup Raptor code params
-  T_ = arg.T();
+  T_ = arg.t();
   K_min_ = arg.k_min();
   block_id_ = 0;
 
@@ -57,36 +56,39 @@ void RaptorEncoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     std::string dumped = pkt->Dump();
     dumped.resize(T_);
     unsigned char source_blk_char[4];
-    s_s_1_char[0] = (block_id_ >> 24) & 0xFF;
-    s_s_1_char[1] = (block_id_ >> 16) & 0xFF;
-    s_s_1_char[2] = (block_id_ >> 8) & 0xFF;
-    s_s_1_char[3] = block_id_ & 0xFF;
+    source_blk_char[0] = (block_id_ >> 24) & 0xFF;
+    source_blk_char[1] = (block_id_ >> 16) & 0xFF;
+    source_blk_char[2] = (block_id_ >> 8) & 0xFF;
+    source_blk_char[3] = block_id_ & 0xFF;
     unsigned char source_blk_size[4];
-    s_s_1_char[0] = (new_symbols >> 24) & 0xFF;
-    s_s_1_char[1] = (new_symbols >> 16) & 0xFF;
-    s_s_1_char[2] = (new_symbols >> 8) & 0xFF;
-    s_s_1_char[3] = new_symbols & 0xFF;
+    source_blk_size[0] = (num_symbols >> 24) & 0xFF;
+    source_blk_size[1] = (num_symbols >> 16) & 0xFF;
+    source_blk_size[2] = (num_symbols >> 8) & 0xFF;
+    source_blk_size[3] = num_symbols & 0xFF;
     unsigned char pkt_data[T_ + 12];
-    strncpy(pkt_data, source_blk_char, 4);
-    strncpy(pkt_data + 4, source_blk_size, 4);
-    strncpy(pkt_data + 12, dumped.c_str(), T_);
+    strncpy((char *)pkt_data, (char *)source_blk_char, 4);
+    strncpy((char *)pkt_data + 8, (char *)source_blk_size, 4);
+    strncpy((char *)pkt_data + 12, dumped.c_str(), T_);
     int symbol_start = 0;
 
     // send packet per symbol
+    LOG(INFO) << "symbols for encoder: " << num_symbols << ", " << num_enc_symbols;
     for (int j = 0; j < num_symbols + num_enc_symbols; j++) {
       unsigned char s_s_char[4];
       s_s_char[0] = (symbol_start >> 24) & 0xFF;
       s_s_char[1] = (symbol_start >> 16) & 0xFF;
       s_s_char[2] = (symbol_start >> 8) & 0xFF;
       s_s_char[3] = symbol_start & 0xFF;
-      strncpy(pkt_data + 8, s_s_char, 4);
+      strncpy((char *)pkt_data + 8, (char *)s_s_char, 4);
       symbol_start++;
 
       bess::Packet *pkt_copy = bess::Packet::copy(pkt);
-      pkt_copy->set_total_len(new_size);
-      pkt_copy->set_data_len(new_size);
+      pkt_copy->set_total_len(T_ + 12);
+      pkt_copy->set_data_len(T_ + 12);
+      LOG(INFO) << "hello " << pkt_copy->buffer<char *>();
       char *ptr = pkt_copy->buffer<char *>() + pkt_copy->data_off();
       bess::utils::CopyInlined(ptr, pkt_data, T_ + 12, true);
+      LOG(INFO) << "hello2 " << pkt_copy->buffer<char *>();
       EmitPacket(ctx, pkt_copy, 0);
     }
 
@@ -102,9 +104,9 @@ ADD_MODULE(RaptorEncoder,
 /********************************** DECODER ***********************************/
 CommandResponse RaptorDecoder::Init(const bess::pb::RaptorDecoderArg &arg) {
   // Setup Raptor code params
-  T_ = arg.T();
+  T_ = arg.t();
   K_min_ = arg.k_min();
-  block_sizes_ = std::map<int, int>;
+  block_sizes_ = std::map<int, int>();
   symbols_recv_block_ = std::map<int, std::vector<int>>();
 
   // retreive source block ID and source block size from payload
@@ -114,49 +116,55 @@ CommandResponse RaptorDecoder::Init(const bess::pb::RaptorDecoderArg &arg) {
 
 void RaptorDecoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
+  int src_blk_id;
+  int symbol_id;
+  int src_blk_size;
+  bess::Packet *pkt = batch->pkts()[0];
   for (int i = 0; i < cnt; i++) {
-    bess::Packet *pkt = batch->pkts()[i];
+    pkt = batch->pkts()[i];
     
     // dissect packet to get source block ID, symbol ID, source block size
     std::string buffer = pkt->buffer<char *>() + pkt->data_off();
-    int src_blk_id = int((unsigned char)(buffer.c_str()[0]) << 24 |
+    src_blk_id = int((unsigned char)(buffer.c_str()[0]) << 24 |
             (unsigned char)(buffer.c_str()[1]) << 16 |
             (unsigned char)(buffer.c_str()[2]) << 8 |
             (unsigned char)(buffer.c_str()[3]));
-    int symbol_id = int((unsigned char)(buffer.c_str()[4]) << 24 |
+    symbol_id = int((unsigned char)(buffer.c_str()[4]) << 24 |
             (unsigned char)(buffer.c_str()[5]) << 16 |
             (unsigned char)(buffer.c_str()[6]) << 8 |
             (unsigned char)(buffer.c_str()[7]));
-    int src_blk_size = int((unsigned char)(buffer.c_str()[8]) << 24 |
+    src_blk_size = int((unsigned char)(buffer.c_str()[8]) << 24 |
             (unsigned char)(buffer.c_str()[9]) << 16 |
             (unsigned char)(buffer.c_str()[10]) << 8 |
             (unsigned char)(buffer.c_str()[11]));
 
     block_sizes_[src_blk_id] = src_blk_size;
-    block_sizes_[src_blk_id].push_back(symbol_id);
+    symbols_recv_block_[src_blk_id].push_back(symbol_id);
   }
 
   // loop through map to emit packets that have enough and can now be decoded
   for (auto const &kv : symbols_recv_block_) {
     int block_id = kv.first;
     std::vector<int> sym_ids = kv.second;
-    if (sym_ids.size() >= src_blk_size + 3) {
+    bess::Packet *pkt_copy;
+    int target_size = (int)(symbols_recv_block_[block_id].size());
+    if ((int)(sym_ids.size()) >= target_size + 3) {
       // can decode, first check if all source symbols are present
       std::map<int, bool> source_sym_ids;
       for (auto const &id : sym_ids) {
         source_sym_ids[id] = true;
       }
       bool source_exists = true;
-      for (int j = 0; j < src_blk_size; j++) {
+      for (int j = 0; j < target_size; j++) {
         if (source_sym_ids.find(j) == source_sym_ids.end()) {
           source_exists = false;
         }
       }
 
+      pkt_copy = bess::Packet::copy(pkt);
       if (source_exists) {
-        bess::Packet *pkt_copy = bess::Packet::copy(pkt);
-        pkt_copy->set_total_len(src_blk_size * 8);
-        pkt_copy->set_data_len(src_blk_size * 8);
+        pkt_copy->set_total_len(target_size * 8);
+        pkt_copy->set_data_len(target_size * 8);
       } else {
         usleep(17073); // replicate decode time
       }
@@ -192,7 +200,7 @@ CommandResponse GELoss::Init(const bess::pb::GELossArg &arg) {
   r_ = r;
   g_s_ = g_s;
   b_s_ = b_s;
-  ge_ge_state_ = 1;
+  ge_state_ = 1;
   
   return CommandSuccess();
 }

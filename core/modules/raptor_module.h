@@ -45,6 +45,8 @@ class RaptorEncoder final : public Module {
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 1;
 
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
  private:
   int T_; // symbol size
   int K_min_; // minimum source block size
@@ -59,10 +61,12 @@ class RaptorDecoder final : public Module {
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 1;
 
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
+
  private:
   int T_; // symbol size
   int K_min_; // minimum source block size
-  std::map<int, std::vector<int>> block_sizes_; // size of blocks being decoded
+  std::map<int, int> block_sizes_; // size of blocks being decoded
   std::map<int, std::vector<int>> symbols_recv_block_; // block to vector of symbols received
 };
 
@@ -73,6 +77,8 @@ class GELoss final : public Module {
 
   static const gate_idx_t kNumIGates = 1;
   static const gate_idx_t kNumOGates = 2; // 1 is sink
+
+  void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
   Random rng_;  // Random number generator
