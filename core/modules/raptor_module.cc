@@ -29,11 +29,152 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include "raptor_module.h"
+#include ""
 #include <vector>
 #include <unistd.h>
+#include <string>
+#include <numeric>
 
-CommandResponse RaptorAndLoss::Init(const bess::pb::RaptorAndLossArg &arg) {
+/********************************** ENCODER ***********************************/
+CommandResponse RaptorEncoder::Init(const bess::pb::RaptorEncoderArg &arg) {
+  // Setup Raptor code params
+  T_ = arg.T();
+  K_min_ = arg.k_min();
+  block_id_ = 0;
+
+  return CommandSuccess();
+}
+
+void RaptorEncoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  // encode each packet as its own source block
+  int cnt = batch->cnt();
+  for (int i = 0; i < cnt; i++) {
+    bess::Packet *pkt = batch->pkts()[i];
+    int num_symbols = pkt->data_len()/T_;
+    int num_enc_symbols = (int)(num_symbols/0.9); // add overhead rate
+
+    // re-packetize into MTU sized packets
+    std::string dumped = pkt->Dump();
+    dumped.resize(T_);
+    unsigned char source_blk_char[4];
+    s_s_1_char[0] = (block_id_ >> 24) & 0xFF;
+    s_s_1_char[1] = (block_id_ >> 16) & 0xFF;
+    s_s_1_char[2] = (block_id_ >> 8) & 0xFF;
+    s_s_1_char[3] = block_id_ & 0xFF;
+    unsigned char source_blk_size[4];
+    s_s_1_char[0] = (new_symbols >> 24) & 0xFF;
+    s_s_1_char[1] = (new_symbols >> 16) & 0xFF;
+    s_s_1_char[2] = (new_symbols >> 8) & 0xFF;
+    s_s_1_char[3] = new_symbols & 0xFF;
+    unsigned char pkt_data[T_ + 12];
+    strncpy(pkt_data, source_blk_char, 4);
+    strncpy(pkt_data + 4, source_blk_size, 4);
+    strncpy(pkt_data + 12, dumped.c_str(), T_);
+    int symbol_start = 0;
+
+    // send packet per symbol
+    for (int j = 0; j < num_symbols + num_enc_symbols; j++) {
+      unsigned char s_s_char[4];
+      s_s_char[0] = (symbol_start >> 24) & 0xFF;
+      s_s_char[1] = (symbol_start >> 16) & 0xFF;
+      s_s_char[2] = (symbol_start >> 8) & 0xFF;
+      s_s_char[3] = symbol_start & 0xFF;
+      strncpy(pkt_data + 8, s_s_char, 4);
+      symbol_start++;
+
+      bess::Packet *pkt_copy = bess::Packet::copy(pkt);
+      pkt_copy->set_total_len(new_size);
+      pkt_copy->set_data_len(new_size);
+      char *ptr = pkt_copy->buffer<char *>() + pkt_copy->data_off();
+      bess::utils::CopyInlined(ptr, pkt_data, T_ + 12, true);
+      EmitPacket(ctx, pkt_copy, 0);
+    }
+
+    block_id_++;
+  }
+}
+
+ADD_MODULE(RaptorEncoder, 
+  "raptor_encoder", 
+  "encoder using Raptor codes")
+/************************************ END *************************************/
+
+/********************************** DECODER ***********************************/
+CommandResponse RaptorDecoder::Init(const bess::pb::RaptorDecoderArg &arg) {
+  // Setup Raptor code params
+  T_ = arg.T();
+  K_min_ = arg.k_min();
+  block_sizes_ = std::map<int, int>;
+  symbols_recv_block_ = std::map<int, std::vector<int>>();
+
+  // retreive source block ID and source block size from payload
+  
+  return CommandSuccess();
+}
+
+void RaptorDecoder::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+  int cnt = batch->cnt();
+  for (int i = 0; i < cnt; i++) {
+    bess::Packet *pkt = batch->pkts()[i];
+    
+    // dissect packet to get source block ID, symbol ID, source block size
+    std::string buffer = pkt->buffer<char *>() + pkt->data_off();
+    int src_blk_id = int((unsigned char)(buffer.c_str()[0]) << 24 |
+            (unsigned char)(buffer.c_str()[1]) << 16 |
+            (unsigned char)(buffer.c_str()[2]) << 8 |
+            (unsigned char)(buffer.c_str()[3]));
+    int symbol_id = int((unsigned char)(buffer.c_str()[4]) << 24 |
+            (unsigned char)(buffer.c_str()[5]) << 16 |
+            (unsigned char)(buffer.c_str()[6]) << 8 |
+            (unsigned char)(buffer.c_str()[7]));
+    int src_blk_size = int((unsigned char)(buffer.c_str()[8]) << 24 |
+            (unsigned char)(buffer.c_str()[9]) << 16 |
+            (unsigned char)(buffer.c_str()[10]) << 8 |
+            (unsigned char)(buffer.c_str()[11]));
+
+    block_sizes_[src_blk_id] = src_blk_size;
+    block_sizes_[src_blk_id].push_back(symbol_id);
+  }
+
+  // loop through map to emit packets that have enough and can now be decoded
+  for (auto const &kv : symbols_recv_block_) {
+    int block_id = kv.first;
+    std::vector<int> sym_ids = kv.second;
+    if (sym_ids.size() >= src_blk_size + 3) {
+      // can decode, first check if all source symbols are present
+      std::map<int, bool> source_sym_ids;
+      for (auto const &id : sym_ids) {
+        source_sym_ids[id] = true;
+      }
+      bool source_exists = true;
+      for (int j = 0; j < src_blk_size; j++) {
+        if (source_sym_ids.find(j) == source_sym_ids.end()) {
+          source_exists = false;
+        }
+      }
+
+      if (source_exists) {
+        bess::Packet *pkt_copy = bess::Packet::copy(pkt);
+        pkt_copy->set_total_len(src_blk_size * 8);
+        pkt_copy->set_data_len(src_blk_size * 8);
+      } else {
+        usleep(17073); // replicate decode time
+      }
+      
+      EmitPacket(ctx, pkt_copy, 0);
+    }
+  }
+}
+
+ADD_MODULE(RaptorDecoder, 
+  "raptor_decoder", 
+  "decoder for received Raptor encoded packets")
+/************************************ END *************************************/
+
+/********************************** GE LOSS ***********************************/
+CommandResponse GELoss::Init(const bess::pb::GELossArg &arg) {
   // Setup GE model
+  // TODO try different values
   double p = arg.p();
   double r = arg.r();
   double g_s = arg.g_s();
@@ -52,75 +193,31 @@ CommandResponse RaptorAndLoss::Init(const bess::pb::RaptorAndLossArg &arg) {
   g_s_ = g_s;
   b_s_ = b_s;
   ge_ge_state_ = 1;
-
-  // Setup Raptor code params
-  T_ = arg.T();
-  K_min_ = arg.k_min();    
-  // GoInt source_block_size = 13; // TODO set
-  // GoInt alignment_size = 1; // TODO set
-
-  // // Create Raptor codec/encoder
-  // new_raptor_codec_ = NewRaptorCodec(source_blocks, alignment_size);
   
   return CommandSuccess();
 }
 
-void RaptorAndLoss::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
-  // setup raptor stuff
-  // treat each packet as 1 source block, 1 16 byte symbol per packet FOR NOW
-  // TODO try different values
-  // TODO add encoding and decoding latencies
+void GELoss::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   int cnt = batch->cnt();
   for (int i = 0; i < cnt; i++) {
     bess::Packet *pkt = batch->pkts()[i];
-    int num_symbols = pkt->data_len()/T_;
-    int num_packets = num_symbols + (int)(num_symbols/0.9); // add overhead rate
-    usleep(17236);
-
-    int received_packets = 0;
-    for (int j = 0; j < num_packets; j++) {
-      if (rng_.GetReal() <= p_ && ge_state_ == 1) {
-        ge_state_ = 0;
-      } else if (rng_.GetReal() <= r_ && ge_state_ == 0) {
-        ge_state_ = 1;
-      }
-
-      double drop_prob = rng_.GetReal();
-      if (!((ge_state_ == 1 && drop_prob <= (1 - g_s_)) ||
-            (ge_state_ == 0 && drop_prob <= (1 - b_s_)))) {
-        received_packets++;
-      }
+    if (rng_.GetReal() <= p_ && ge_state_ == 1) {
+      ge_state_ = 0;
+    } else if (rng_.GetReal() <= r_ && ge_state_ == 0) {
+      ge_state_ = 1;
     }
 
-    while (received_packets < num_symbols + 3) {
-      if (rng_.GetReal() <= p_ && ge_state_ == 1) {
-        ge_state_ = 0;
-      } else if (rng_.GetReal() <= r_ && ge_state_ == 0) {
-        ge_state_ = 1;
-      }
-
-      double drop_prob = rng_.GetReal();
-      if (!((ge_state_ == 1 && drop_prob <= (1 - g_s_)) ||
-            (ge_state_ == 0 && drop_prob <= (1 - b_s_)))) {
-        received_packets++;
-      }
+    double drop_prob = rng_.GetReal();
+    if ((ge_state_ == 1 && drop_prob <= (1 - g_s_)) ||
+          (ge_state_ == 0 && drop_prob <= (1 - b_s_))) {
+      EmitPacket(ctx, pkt, 1);
+    } else {
+      EmitPacket(ctx, pkt, 0);
     }
-    usleep(17073);
-
-    EmitPacket(pkt, 0);
   }
 }
 
-ADD_MODULE(RaptorAndLoss, 
-  "raptor_encode", 
-  "encoder using Raptor codes")
-// ADD_MODULE(RaptorAndLoss, 
-//   "raptor_encode", 
-//   "encoder using Raptor codes")
-// ADD_MODULE(RaptorDecoder, 
-//   "raptor_decode", 
-//   "decoder for received Raptor encoded packets")
-// ADD_MODULE(RepairForwarder, 
-//   "repair_forwarder", 
-//   "forwards repair requests from decoder to encoder")
-
+ADD_MODULE(GELoss, 
+  "ge_loss", 
+  "loss model based on GE model")
+/************************************ END *************************************/
